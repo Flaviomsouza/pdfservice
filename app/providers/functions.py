@@ -334,6 +334,7 @@ def pdf_generator(capa, content, image_id, is_worker):
             eixo_y_pptx = 20
 
             for coluna in other_columns:
+                print(coluna)
                 titulo = str(coluna)
                 if titulo == 'nan':
                     titulo = ''

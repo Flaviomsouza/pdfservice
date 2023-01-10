@@ -393,6 +393,9 @@ def pdf_generator(capa, content, image_id, is_worker):
             pdf.showPage()
         pdf.save()
         apresentacao.save(f'app/static/media/pptx/{image_id}.pptx')
+
+        print(f'pdf={os.path.exists(f"app/static/media/pptx/{image_id}.pptx")}')
+        print(f'pptx={os.path.exists(f"app/static/media/pdf/{image_id}.pdf")}')
         
         if is_worker == True:
             session.add(Worksheet_Content(

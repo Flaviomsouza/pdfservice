@@ -259,13 +259,13 @@ def lista_de_books():
                 flash('Cadastros antigos removidos com sucesso.')
             return redirect('/pdfservice/painel-administrativo/lista-de-books')
         else:
-            messages = redis_db.get('messages')
+            '''messages = redis_db.get('messages')
             if messages:
                 message_list = messages.split('&')
                 for message in message_list:
                     if len(message) > 2:
                         flash(message)
-                redis_db.delete('messages')
+                redis_db.delete('messages')'''
             filtro = request.args.get('filter')
             if filtro:
                 if filtro == 'all':

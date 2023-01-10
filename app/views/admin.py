@@ -15,7 +15,7 @@ from rq import Queue
 from worker import conn
 import redis
 
-redis_db = redis.Redis(decode_responses=True, host=os.environ['REDIS_HOST'], username=os.environ['REDIS_USERNAME'], password=os.environ['REDIS_PASSWORD'])
+redis_db = redis.Redis(decode_responses=True, host=os.environ['REDIS_HOST'], username=os.environ['REDIS_USERNAME'], password=os.environ['REDIS_PASSWORD'], port=os.environ['REDIS_PORT'])
 
 admin_bp = Blueprint(
     'admin_bp',
@@ -259,13 +259,13 @@ def lista_de_books():
                 flash('Cadastros antigos removidos com sucesso.')
             return redirect('/pdfservice/painel-administrativo/lista-de-books')
         else:
-            '''messages = redis_db.get('messages')
+            messages = redis_db.get('messages')
             if messages:
                 message_list = messages.split('&')
                 for message in message_list:
                     if len(message) > 2:
                         flash(message)
-                redis_db.delete('messages')'''
+                redis_db.delete('messages')
             filtro = request.args.get('filter')
             if filtro:
                 if filtro == 'all':
@@ -316,6 +316,7 @@ def lista_de_books():
                     # Gerando PDF
                     result = q.enqueue(pdf_generator, capa, content, image_id, False, job_timeout='30m')
                     flash(f'O book {(book.title).title()} está sendo gerado. Quando estiver concluído, ele aparecerá em "Lista de Books" ou notificará na tela em caso de erro.')
+                    return redirect('/pdfservice/painel-administrativo/lista-de-books')
             
             return render_template('lista-de-books.html')
     except Exception as error:

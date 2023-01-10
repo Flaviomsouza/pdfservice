@@ -231,6 +231,7 @@ def pdf_generator(capa, content, image_id, is_worker):
         pdf.showPage()
 
         for i, linha in enumerate(linhas):
+            print('ok')
             with open(f'app/static/media/pdf_provider_images/temp_image{i}.png', 'wb') as nova_imagem:
                 imagem = requests.get(linha[foto_column], stream=True)
                 if not imagem.ok:

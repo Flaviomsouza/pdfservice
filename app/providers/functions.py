@@ -231,7 +231,7 @@ def pdf_generator(capa, content, image_id, is_worker):
         pdf.showPage()
 
         for i, linha in enumerate(linhas):
-            print('ok')
+            print('gerando pdf')
             with open(f'app/static/media/pdf_provider_images/temp_image{i}.png', 'wb') as nova_imagem:
                 imagem = requests.get(linha[foto_column], stream=True)
                 if not imagem.ok:
@@ -405,6 +405,7 @@ def pdf_generator(capa, content, image_id, is_worker):
             session.commit()
         message = f'Book {capa["nome"].title()} cadastrado e seus arquivos PDF e PPTX gerados com sucesso.'
         send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+        print('terminando de gerar pdf')
             
     except UnidentifiedImageError as error:
         print(str(error))

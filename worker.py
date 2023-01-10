@@ -7,7 +7,7 @@ load_dotenv()
 
 listen = ['high', 'default', 'low']
 
-redis_url = os.getenv('REDIS_TLS_URL', os.environ['REDIS_URL'])
+redis_url = os.getenv('REDIS_URL', os.environ['REDIS_URL'])
 
 '''conn = redis.Redis(
     decode_responses=False, 

@@ -15,7 +15,7 @@ from rq import Queue
 from worker import conn
 import redis
 
-redis_url = os.getenv('REDIS_TLS_URL', os.environ['REDIS_URL'])
+redis_url = os.getenv('REDIS_URL', os.environ['REDIS_URL'])
 redis_db = redis.from_url(
     redis_url,
     decode_responses=True

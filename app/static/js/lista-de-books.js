@@ -88,7 +88,7 @@ function atualizarLista() {
         baixarPDFBt.className = 'btn btn-sm btn-danger linha-bt-bt'
         baixarPDFBt.innerHTML = 'Baixar PDF'
         baixarPDFBt.addEventListener('click', () => {
-            window.location.href = `/pdfservice/painel-administrativo/lista-de-books?filter=downloadpdf&arg=${image_id}.pdf`
+            window.open(`/pdfservice/painel-administrativo/lista-de-books?filter=downloadpdf&arg=${image_id}.pdf`)
         })
         baixarPDF.appendChild(baixarPDFBt)
         
@@ -101,7 +101,7 @@ function atualizarLista() {
         baixarPPTXBt.className = 'btn btn-sm btn-danger linha-bt-bt'
         baixarPPTXBt.innerHTML = 'Baixar PPTX'
         baixarPPTXBt.addEventListener('click', () => {
-            window.location.href = `/pdfservice/painel-administrativo/lista-de-books?filter=downloadpptx&arg=${image_id}.pptx`
+            window.open(`/pdfservice/painel-administrativo/lista-de-books?filter=downloadpptx&arg=${image_id}.pptx`)
         })
         baixarPPTX.appendChild(baixarPPTXBt)
 

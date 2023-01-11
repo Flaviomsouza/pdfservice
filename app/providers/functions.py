@@ -1,6 +1,5 @@
-from pathlib import Path
 import requests
-from reportlab.lib.pagesizes import A4, landscape, mm
+from reportlab.lib.pagesizes import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from secrets import token_urlsafe
@@ -10,17 +9,16 @@ from pptx.util import Mm
 from pptx.enum.text import PP_PARAGRAPH_ALIGNMENT
 from pptx.dml.color import RGBColor
 from PIL import UnidentifiedImageError
-from app import db
-from flask import flash
 from json import loads, dumps
-from sqlalchemy import Column, Date, Integer, String, create_engine, select
+from sqlalchemy import Column, Date, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, Session
 from datetime import date, timedelta
 from sqlalchemy.dialects.mysql import JSON
 from dotenv import load_dotenv
-from app import app
+from app.providers.s3_services import upload_file_to_s3
 load_dotenv()
 import os
+from io import BytesIO
 
 '''
 Função para gerar 
@@ -47,7 +45,7 @@ class Worksheet_Content(Base):
         self.creation_date = creation_date
         self.image_id = image_id
 
-engine = create_engine(os.environ['SQLALCHEMY_DATABASE_URI'], echo=True, future=True)
+engine = create_engine(os.environ['SQLALCHEMY_DATABASE_URI'], echo=False, future=True)
 session = Session(engine)
 
 
@@ -89,18 +87,29 @@ def pdf_generator(capa, content, image_id, is_worker):
             else:
                 other_columns.append(coluna)
         if not endereco_column:
-            return False, 'A coluna do endereço não foi reconhecida. A planilha deve fornecer uma coluna de nome "Endereco", "Endereço", "Direccion", "Dirección" ou "Address".'
+            message = f'A coluna do endereço no book {capa["nome"]} não foi reconhecida. A planilha deve fornecer uma coluna de nome "Endereco", "Endereço", "Direccion", "Dirección" ou "Address".'
+            send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+            return False
         if not latitude_column:
-            return False, 'A coluna da latitude não foi reconhecida. A planilha deve fornecer uma coluna de nome "Latitude" ou "Latitud".'
+            message = f'A coluna da latitude no book {capa["nome"]} não foi reconhecida. A planilha deve fornecer uma coluna de nome "Latitude" ou "Latitud".'
+            send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+            return False
         if not longitude_column:
-            return False, 'A coluna da longitude não foi reconhecida. A planilha deve fornecer uma coluna de nome "Longitude" ou "Longitud".'
+            message = f'A coluna da longitude no book {capa["nome"]} não foi reconhecida. A planilha deve fornecer uma coluna de nome "Longitude" ou "Longitud".'
+            send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+            return False
         if not codigo_column:
-            return False, 'A coluna do código não foi reconhecida. A planilha deve fornecer uma coluna de nome "Cod.", "Cód.", "Cod", "Cód", "Codigo", "Código" ou "Code".'
+            message = f'A coluna do código no book {capa["nome"]} não foi reconhecida. A planilha deve fornecer uma coluna de nome "Cod.", "Cód.", "Cod", "Cód", "Codigo", "Código" ou "Code".'
+            send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+            return False
         if not foto_column:
-            return False, 'A coluna da foto não foi reconhecida. A planilha deve fornecer uma coluna de nome "Foto", "Imagem", "Image", "Picture", "Photo", "Imagen" ou "Fotografia".'
+            message = f'A coluna da foto no book {capa["nome"]} não foi reconhecida. A planilha deve fornecer uma coluna de nome "Foto", "Imagem", "Image", "Picture", "Photo", "Imagen" ou "Fotografia".'
+            send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+            return False
 
         # Gerando PDF
-        pdf = canvas.Canvas(f'app/static/media/pdf/{image_id}.pdf', (400*mm, 220*mm))
+        pdf_buffer = BytesIO()
+        pdf = canvas.Canvas(pdf_buffer, (400*mm, 220*mm))
         # Gerando PPTX
         apresentacao = Presentation()
         apresentacao.slide_height = Mm(220)
@@ -232,6 +241,19 @@ def pdf_generator(capa, content, image_id, is_worker):
 
         for i, linha in enumerate(linhas):
             print('gerando pdf')
+            print(f'1 {linha[foto_column]}')
+            if str(linha[foto_column]) == 'nan':
+                message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
+                send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+                continue
+            elif not 'http' in str(linha[foto_column]):
+                message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
+                send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+                continue
+            elif not '.png' in str(linha[foto_column]) and not '.jpg' in str(linha[foto_column]):
+                message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
+                send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+                continue
             with open(f'app/static/media/pdf_provider_images/temp_image{i}.png', 'wb') as nova_imagem:
                 imagem = requests.get(linha[foto_column], stream=True)
                 if not imagem.ok:
@@ -334,7 +356,6 @@ def pdf_generator(capa, content, image_id, is_worker):
             eixo_y_pptx = 20
 
             for coluna in other_columns:
-                print(coluna)
                 titulo = str(coluna)
                 if titulo == 'nan':
                     titulo = ''
@@ -392,11 +413,25 @@ def pdf_generator(capa, content, image_id, is_worker):
             
             pdf.showPage()
         pdf.save()
-        apresentacao.save(f'app/static/media/pptx/{image_id}.pptx')
 
-        print(f'pdf={os.path.exists(f"app/static/media/pptx/{image_id}.pptx")}')
-        print(f'pptx={os.path.exists(f"app/static/media/pdf/{image_id}.pdf")}')
+        #Gravando pdf
+        with pdf_buffer as pdf_file:
+            pdf_upload = upload_file_to_s3(pdf_file.getvalue(), f'pdf/{image_id}.pdf', 'application/pdf')
+            if pdf_upload == False:
+                message = 'Falha ao salvar o arquivo PDF. Apague o book e tente novamente.'
+                send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+        pdf_buffer.close()
         
+        # Gravando pptx
+        pptx_buffer = BytesIO()
+        apresentacao.save(pptx_buffer)
+        with pptx_buffer as pptx_file:
+            pptx_upload = upload_file_to_s3(pptx_file.getvalue(), f'pptx/{image_id}.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+            if pptx_upload == False:
+                message = 'Falha ao salvar o arquivo PPTX. Apague o book e tente novamente.'
+                send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
+        pptx_buffer.close()
+
         if is_worker == True:
             session.add(Worksheet_Content(
                 capa['nome'].title(),

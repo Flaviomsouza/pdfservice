@@ -1,4 +1,5 @@
-from flask import Blueprint, flash, make_response, render_template, redirect, request, Response, get_flashed_messages
+from flask import Blueprint, flash, make_response, render_template, redirect, request, Response
+import requests
 from app.models.basemodels import  User_For_View_, Worksheet_For_View_
 from pymysql.err import IntegrityError as IntegrityError2
 from app.providers.hash_provider import check_password, hash_generate
@@ -14,6 +15,9 @@ import os
 from rq import Queue
 from worker import conn
 import redis
+import boto3
+from io import BytesIO
+from tempfile import TemporaryFile
 
 redis_url = os.getenv('REDIS_URL', os.environ['REDIS_URL'])
 redis_db = redis.from_url(
@@ -25,6 +29,12 @@ admin_bp = Blueprint(
     'admin_bp',
     __name__,
     url_prefix='/pdfservice'
+)
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
 )
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
@@ -184,17 +194,18 @@ def novo_book():
                     longitude_check = False
                     codigo_check = False
                     for i, coluna in enumerate(colunas):
-                        if 'endereço' in coluna.lower() or 'endereco' in coluna.lower() or 'direccion' in coluna.lower() or 'dirección' in coluna.lower() or 'address' in coluna.lower():
+                        print(str(coluna))
+                        if 'endereço' in str(coluna).lower() or 'endereco' in str(coluna).lower() or 'direccion' in str(coluna).lower() or 'dirección' in str(coluna).lower() or 'address' in str(coluna).lower():
                             endereco_check = True
-                        elif 'foto' in coluna.lower() or 'imagem' in coluna.lower() or 'imagen' in coluna.lower() or 'fotografia' in coluna.lower() or 'fotografía' in coluna.lower() or 'image' in coluna.lower() or 'picture' in coluna.lower() or 'photo' in coluna.lower():
+                        elif 'foto' in str(coluna).lower() or 'imagem' in str(coluna).lower() or 'imagen' in str(coluna).lower() or 'fotografia' in str(coluna).lower() or 'fotografía' in str(coluna).lower() or 'image' in str(coluna).lower() or 'picture' in str(coluna).lower() or 'photo' in str(coluna).lower():
                             foto_check = True
-                        elif 'latitude' in coluna.lower() or 'latitud' in coluna.lower():
+                        elif 'latitude' in str(coluna).lower() or 'latitud' in str(coluna).lower():
                             latitude_check = True
-                        elif 'longitude' in coluna.lower() or 'longitud' in coluna.lower():
+                        elif 'longitude' in str(coluna).lower() or 'longitud' in str(coluna).lower():
                             longitude_check = True
-                        elif 'codigo' in coluna.lower() or 'código' in coluna.lower() or 'cod' in coluna.lower() or 'cód' in coluna.lower() or 'code' in coluna.lower():
+                        elif 'codigo' in str(coluna).lower() or 'código' in str(coluna).lower() or 'cod' in str(coluna).lower() or 'cód' in str(coluna).lower() or 'code' in str(coluna).lower():
                             codigo_check = True
-                        colunas[i] = coluna
+                        
                     if not foto_check or not endereco_check or not latitude_check or not longitude_check or not codigo_check:
                         planilhas_não_convertidas.append(planilha)
                         continue
@@ -225,6 +236,7 @@ def novo_book():
                     
             return redirect('/pdfservice/painel-administrativo/novo-book')
         except Exception as error:
+            print(str(error))
             flash('Erro no servidor. Tente novamente.')
             return redirect('/pdfservice/painel-administrativo/novo-book')
 
@@ -239,12 +251,10 @@ def lista_de_books():
             if request.form.get('tipo') == 'excluir':
                 id = request.form.get('id')
                 book = Worksheet_Content.query.filter(Worksheet_Content.id == id).first()
-                book_pdf = f'app/static/media/pdf/{book.image_id}.pdf'
-                book_pptx = f'app/static/media/pptx/{book.image_id}.pptx'
-                if os.path.exists(book_pdf):
-                    os.remove(book_pdf)
-                if os.path.exists(book_pptx):
-                    os.remove(book_pptx)
+                book_pdf = f'pdf/{book.image_id}.pdf'
+                book_pptx = f'pptx/{book.image_id}.pptx'
+                s3.delete_object(Bucket=os.environ['AWS_BUCKET_NAME'], Key=book_pdf)
+                s3.delete_object(Bucket=os.environ['AWS_BUCKET_NAME'], Key=book_pptx)
                 db.session.delete(book)
                 db.session.commit()
                 flash('Book removido com sucesso.')
@@ -286,28 +296,16 @@ def lista_de_books():
                     return dumps(books, default=str)
                 elif filtro == 'downloadpdf':
                     arquivo = request.args.get('arg')
-                    try:
-                        with open(f'app/static/media/pdf/{arquivo}', 'rb') as f: 
-                            dados = f.read()
-                        return make_response(dados, {'content-type': 'application/pdf'})
-                    except FileNotFoundError:
-                        flash('Arquivo não encontrado, possivelmente excluído em manutenção de rotina do servidor. Você deve gerá-lo novamente.')
-                        return redirect('/pdfservice/painel-administrativo/lista-de-books')
-                    except:
-                        flash('Erro no servidor. Estamos trabalhando para corrigir.')
-                        return redirect('/pdfservice/painel-administrativo/lista-de-books')
+                    s3.download_file(os.environ['AWS_BUCKET_NAME'], f'pdf/{arquivo}', 'app/static/media/pdf/temp.pdf')
+                    with open('app/static/media/pdf/temp.pdf', 'rb') as tempfile:
+                        dados = tempfile.read()
+                    return make_response(dados, {'content-type': 'application/pdf'})
                 elif filtro == 'downloadpptx':
-                    try:
-                        arquivo = request.args.get('arg')
-                        with open(f'app/static/media/pptx/{arquivo}', 'rb') as f: 
-                            dados = f.read()
-                        return make_response(dados, {'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'})
-                    except FileNotFoundError:
-                        flash('Arquivo não encontrado, possivelmente excluído em manutenção de rotina do servidor. Você deve gerá-lo novamente.')
-                        return redirect('/pdfservice/painel-administrativo/lista-de-books')
-                    except:
-                        flash('Erro no servidor. Estamos trabalhando para corrigir.')
-                        return redirect('/pdfservice/painel-administrativo/lista-de-books')
+                    arquivo = request.args.get('arg')
+                    s3.download_file(os.environ['AWS_BUCKET_NAME'], f'pptx/{arquivo}', 'app/static/media/pptx/temp.pptx')
+                    with open('app/static/media/pptx/temp.pptx', 'rb') as tempfile:
+                        dados = tempfile.read()
+                    return make_response(dados, {'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'})
                 elif filtro == 'gerarNovamente':
                     id = int(request.args.get('arg'))
                     book = Worksheet_Content.query.filter(Worksheet_Content.id == id).first()
@@ -331,8 +329,9 @@ def lista_de_books():
 @admin_bp.route('/pdfview/<pdf_file>')
 def pdfview(pdf_file):
     try:
-        with open(f'app/static/media/pdf/{pdf_file}', 'rb') as f: 
-            dados = f.read()
+        s3.download_file(os.environ['AWS_BUCKET_NAME'], f'pdf/{pdf_file}', 'app/static/media/pdf/temp_view.pdf')
+        with open('app/static/media/pdf/temp_view.pdf', 'rb') as tempfile:
+            dados = tempfile.read()
         return make_response(dados, {'content-type': 'application/pdf'})
     except FileNotFoundError:
         return 'Link inexistente. Contate o servidor. (Erro: Arquivo não encontrado)'

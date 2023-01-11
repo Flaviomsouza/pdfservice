@@ -16,8 +16,7 @@ from rq import Queue
 from worker import conn
 import redis
 import boto3
-from io import BytesIO
-from tempfile import TemporaryFile
+from botocore.exceptions import ClientError
 
 redis_url = os.getenv('REDIS_URL', os.environ['REDIS_URL'])
 redis_db = redis.from_url(
@@ -312,7 +311,7 @@ def lista_de_books():
                     print(f'Book = {book}')
                     capa = {'nome':book.title, 'cliente':book.company, 'pessoa':book.person}
                     content = loads(book.content)
-                    image_id = book.image_id
+                    image_id = str(book.image_id)
                     # Criando fila rq
                     q = Queue(connection=conn)
                     # Gerando PDF
@@ -321,6 +320,10 @@ def lista_de_books():
                     return redirect('/pdfservice/painel-administrativo/lista-de-books')
             
             return render_template('lista-de-books.html')
+    except ClientError as error:
+        print(str(error))
+        flash('Aquivo inexistente ou corrompido. Clique em gerar novamente.')
+        return redirect('/pdfservice/painel-administrativo/lista-de-books')
     except Exception as error:
         print(str(error))
         flash('Erro no servidor. Tente novamente.')

@@ -1,22 +1,18 @@
-import os
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import mm
 from io import BytesIO
+from PIL import Image
 import requests
-from app.providers.s3_services import upload_file_to_s3
-from dotenv import load_dotenv
-load_dotenv()
 
 
-# Gerando PDF
-pdf_buffer = BytesIO()
-pdf = canvas.Canvas(pdf_buffer, (400*mm, 220*mm))
-pdf.drawString(100,100, 'TesteBuffer')
-pdf.save()
-
-with pdf_buffer as arquivo:
-    pdf_upload = upload_file_to_s3(arquivo.getvalue(), 'public/teste_buffer2.pdf', 'application/pdf')
-    if pdf_upload == False:
-        message = 'Falha ao salvar o arquivo PDF. Apague o book e tente novamente.'
-        send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
-pdf_buffer.close()
+with open('testeimg_compact.jpg', 'wb') as nova_imagem:
+    imagem = requests.get('https://i.ibb.co/2gJNTrK/Av-Francisco-Rodrigues-Filho-Rotat-ria-Retorno.jpg', stream=True)
+    if not imagem.ok:
+        print('Link de imagem inexistente.')
+    else:
+        for dado in imagem.iter_content():
+            nova_imagem.write(dado)
+imagem_pil = Image.open('testeimg_compact.jpg')
+size = imagem_pil.size
+if size[0] > 1280:
+    new_image = imagem_pil.resize((1280, 768))
+new_image = new_image.convert('RGB')
+new_image.save('testeimg_compact.jpg', 'JPEG')

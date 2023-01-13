@@ -19,6 +19,7 @@ from app.providers.s3_services import upload_file_to_s3
 load_dotenv()
 import os
 from io import BytesIO
+from PIL import Image
 
 '''
 Função para gerar 
@@ -261,6 +262,15 @@ def pdf_generator(capa, content, image_id, is_worker):
                 else:
                     for dado in imagem.iter_content():
                         nova_imagem.write(dado)
+            imagem_pil = Image.open(f'app/static/media/pdf_provider_images/temp_image{i}.png')
+            size = imagem_pil.size
+            new_image = None
+            if size[0] > 1280:
+                new_image = imagem_pil.resize((1280, 768))
+                new_image = new_image.convert('RGB')
+            else:
+                new_image = imagem_pil.convert('RGB')
+            new_image.save(f'app/static/media/pdf_provider_images/temp_image{i}.jpg', 'JPEG')
 
 
             coordenadas = f'{linha[latitude_column]}  {linha[longitude_column]}'
@@ -292,10 +302,10 @@ def pdf_generator(capa, content, image_id, is_worker):
             endereco_text.font.color.rgb = RGBColor(255,255,255)
 
             # Imagem PDF
-            pdf.drawImage(f'app/static/media/pdf_provider_images/temp_image{i}.png', 3*mm, 18.19*mm, 305*mm, 180*mm)
+            pdf.drawImage(f'app/static/media/pdf_provider_images/temp_image{i}.jpg', 3*mm, 18.19*mm, 305*mm, 180*mm)
 
             #Imagem PPTX
-            imagem = slide.shapes.add_picture(f'app/static/media/pdf_provider_images/temp_image{i}.png', Mm(3), Mm(21.81), height=Mm(180), width=Mm(310))
+            imagem = slide.shapes.add_picture(f'app/static/media/pdf_provider_images/temp_image{i}.jpg', Mm(3), Mm(21.81), height=Mm(180), width=Mm(310))
 
             # Coordenadas PDF
             pdf.setFont('Helvetica-Bold', 5*mm)

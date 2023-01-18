@@ -50,7 +50,7 @@ engine = create_engine(os.environ['SQLALCHEMY_DATABASE_URI'], echo=False, future
 session = Session(engine)
 
 
-ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+ALLOWED_EXTENSIONS = {'xlsx', 'kml'}
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -241,22 +241,23 @@ def pdf_generator(capa, content, image_id, is_worker):
         pdf.showPage()
 
         for i, linha in enumerate(linhas):
+            foto_link = str(linha[foto_column])
             print('gerando pdf')
-            print(f'1 {linha[foto_column]}')
-            if str(linha[foto_column]) == 'nan':
+            print(f'1 {foto_link}')
+            if str(foto_link) == 'nan':
                 message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
                 send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
                 continue
-            elif not 'http' in str(linha[foto_column]):
+            elif not 'http' in str(foto_link):
                 message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
                 send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
                 continue
-            elif not '.png' in str(linha[foto_column]) and not '.jpg' in str(linha[foto_column]):
+            elif foto_link[len(foto_link) - 4:len(foto_link)] not in ['.png', '.jpg', 'jpeg']:
                 message = f'A linha {i + 1} do book {str(capa["nome"])} não foi gerada. Imagem inválida'
                 send_message = requests.get(f'{os.environ["APP_URL"]}/pdfservice/flash-message-generate?message={message}', headers={'Secret-Key': os.environ['SECRET_KEY']})
                 continue
             with open(f'app/static/media/pdf_provider_images/temp_image{i}.png', 'wb') as nova_imagem:
-                imagem = requests.get(linha[foto_column], stream=True)
+                imagem = requests.get(foto_link, stream=True)
                 if not imagem.ok:
                     return False, 'Link de imagem inexistente.'
                 else:

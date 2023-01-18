@@ -186,6 +186,9 @@ def novo_book():
                 planilhas_não_convertidas = []
                 for planilha in planilhas:
                     colunas = list(pd.read_excel(arquivo, sheet_name=planilha).columns)
+                    if len(colunas) > 15:
+                        flash(f'A planilha {planilha} não foi gerada, pois tem mais de 15 colunas.')
+                        continue
                     # Verifica se as colunas Endereço e Foto estão presentes
                     endereco_check = False
                     foto_check = False

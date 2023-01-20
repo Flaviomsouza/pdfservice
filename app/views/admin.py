@@ -168,78 +168,78 @@ def colaboradores():
 @login_required
 def novo_book():
     if request.method == 'POST':
-        #try:
-        nome = request.form.get('nome')
-        cliente = request.form.get('cliente') if request.form.get('cliente') else None
-        pessoa = request.form.get('pessoa') if request.form.get('pessoa') else None
-        if not nome:
-            flash('Você deve fornecer um nome para o novo book.')
-            return redirect('/pdfservice/painel-administrativo/novo-book')
-        arquivo = request.files.get('input-file')
-        if not arquivo or arquivo.filename == '':
-            flash('Nenhum arquivo foi enviado.')
-        elif not allowed_file(arquivo.filename):
-            flash('Formato de arquivo não suportado. Você deve enviar arquivos ".xlsx" ou ".xls"')
-        else:
-            tabela = pd.ExcelFile(arquivo)
-            planilhas = tabela.sheet_names # Pega o nome de todas as abas da tabela
-            planilhas_não_convertidas = []
-            for planilha in planilhas:
-                colunas = list(pd.read_excel(arquivo, sheet_name=planilha).columns)
-                if len(colunas) > 15:
-                    flash(f'A planilha {planilha} não foi gerada, pois tem mais de 15 colunas.')
-                    continue
-                # Verifica se as colunas Endereço e Foto estão presentes
-                endereco_check = False
-                foto_check = False
-                latitude_check = False
-                longitude_check = False
-                codigo_check = False
-                for i, coluna in enumerate(colunas):
-                    if 'endereço' in str(coluna).lower() or 'endereco' in str(coluna).lower() or 'direccion' in str(coluna).lower() or 'dirección' in str(coluna).lower() or 'address' in str(coluna).lower():
-                        endereco_check = True
-                    elif 'foto' in str(coluna).lower() or 'imagem' in str(coluna).lower() or 'imagen' in str(coluna).lower() or 'fotografia' in str(coluna).lower() or 'fotografía' in str(coluna).lower() or 'image' in str(coluna).lower() or 'picture' in str(coluna).lower() or 'photo' in str(coluna).lower():
-                        foto_check = True
-                    elif 'latitude' in str(coluna).lower() or 'latitud' in str(coluna).lower():
-                        latitude_check = True
-                    elif 'longitude' in str(coluna).lower() or 'longitud' in str(coluna).lower():
-                        longitude_check = True
-                    elif 'codigo' in str(coluna).lower() or 'código' in str(coluna).lower() or 'cod' in str(coluna).lower() or 'cód' in str(coluna).lower() or 'code' in str(coluna).lower():
-                        codigo_check = True
+        try:
+            nome = request.form.get('nome')
+            cliente = request.form.get('cliente') if request.form.get('cliente') else None
+            pessoa = request.form.get('pessoa') if request.form.get('pessoa') else None
+            if not nome:
+                flash('Você deve fornecer um nome para o novo book.')
+                return redirect('/pdfservice/painel-administrativo/novo-book')
+            arquivo = request.files.get('input-file')
+            if not arquivo or arquivo.filename == '':
+                flash('Nenhum arquivo foi enviado.')
+            elif not allowed_file(arquivo.filename):
+                flash('Formato de arquivo não suportado. Você deve enviar arquivos ".xlsx" ou ".xls"')
+            else:
+                tabela = pd.ExcelFile(arquivo)
+                planilhas = tabela.sheet_names # Pega o nome de todas as abas da tabela
+                planilhas_não_convertidas = []
+                for planilha in planilhas:
+                    colunas = list(pd.read_excel(arquivo, sheet_name=planilha).columns)
+                    if len(colunas) > 15:
+                        flash(f'A planilha {planilha} não foi gerada, pois tem mais de 15 colunas.')
+                        continue
+                    # Verifica se as colunas Endereço e Foto estão presentes
+                    endereco_check = False
+                    foto_check = False
+                    latitude_check = False
+                    longitude_check = False
+                    codigo_check = False
+                    for i, coluna in enumerate(colunas):
+                        if 'endereço' in str(coluna).lower() or 'endereco' in str(coluna).lower() or 'direccion' in str(coluna).lower() or 'dirección' in str(coluna).lower() or 'address' in str(coluna).lower():
+                            endereco_check = True
+                        elif 'foto' in str(coluna).lower() or 'imagem' in str(coluna).lower() or 'imagen' in str(coluna).lower() or 'fotografia' in str(coluna).lower() or 'fotografía' in str(coluna).lower() or 'image' in str(coluna).lower() or 'picture' in str(coluna).lower() or 'photo' in str(coluna).lower():
+                            foto_check = True
+                        elif 'latitude' in str(coluna).lower() or 'latitud' in str(coluna).lower():
+                            latitude_check = True
+                        elif 'longitude' in str(coluna).lower() or 'longitud' in str(coluna).lower():
+                            longitude_check = True
+                        elif 'codigo' in str(coluna).lower() or 'código' in str(coluna).lower() or 'cod' in str(coluna).lower() or 'cód' in str(coluna).lower() or 'code' in str(coluna).lower():
+                            codigo_check = True
+                        
+                    if not foto_check or not endereco_check or not latitude_check or not longitude_check or not codigo_check:
+                        planilhas_não_convertidas.append(planilha)
+                        continue
                     
-                if not foto_check or not endereco_check or not latitude_check or not longitude_check or not codigo_check:
-                    planilhas_não_convertidas.append(planilha)
-                    continue
-                
-                book = pd.read_excel(arquivo, sheet_name=planilha).to_dict('records')
-                image_id = image_id_generator()
-                capa = {'nome': nome, 'cliente': cliente, 'pessoa': pessoa}
-                content = {'colunas': colunas, 'conteudo': book}
-                
-                # Criando fila rq
-                q = Queue(connection=conn)
-                # Gerando PDF
-                result = q.enqueue(pdf_generator, capa, content, image_id, True, job_timeout='30m')
-                flash(f'O book {nome.title()} está sendo gerado. Quando estiver concluído, ele aparecerá em "Lista de Books" ou notificará na tela em caso de erro.')
+                    book = pd.read_excel(arquivo, sheet_name=planilha).to_dict('records')
+                    image_id = image_id_generator()
+                    capa = {'nome': nome, 'cliente': cliente, 'pessoa': pessoa}
+                    content = {'colunas': colunas, 'conteudo': book}
+                    
+                    # Criando fila rq
+                    q = Queue(connection=conn)
+                    # Gerando PDF
+                    result = q.enqueue(pdf_generator, capa, content, image_id, True, job_timeout='30m')
+                    flash(f'O book {nome.title()} está sendo gerado. Quando estiver concluído, ele aparecerá em "Lista de Books" ou notificará na tela em caso de erro.')
 
-            if len(planilhas_não_convertidas) > 0:
-                flash_text = 'As seguintes planilhas não puderam ser convertidas: '
-                for item in planilhas_não_convertidas:
-                    texto = flash_text + f'{item}, '
-                    flash_text = texto
-                flash_text = f'''
-                {flash_text} .
-                Motivo: Alguma coluna obrigatória não foi reconhecida.
-                As colunas obrigatórias são código, endereço, foto, latitude e longitude.
-                Esses termos em espanhol e em inglês também são aceitos.
-                '''
-                flash(flash_text)
-                
-        return redirect('/pdfservice/painel-administrativo/novo-book')
-        '''except Exception as error:
+                if len(planilhas_não_convertidas) > 0:
+                    flash_text = 'As seguintes planilhas não puderam ser convertidas: '
+                    for item in planilhas_não_convertidas:
+                        texto = flash_text + f'{item}, '
+                        flash_text = texto
+                    flash_text = f'''
+                    {flash_text} .
+                    Motivo: Alguma coluna obrigatória não foi reconhecida.
+                    As colunas obrigatórias são código, endereço, foto, latitude e longitude.
+                    Esses termos em espanhol e em inglês também são aceitos.
+                    '''
+                    flash(flash_text)
+                    
+            return redirect('/pdfservice/painel-administrativo/novo-book')
+        except Exception as error:
             print(str(error))
             flash('Erro no servidor. Tente novamente.')
-            return redirect('/pdfservice/painel-administrativo/novo-book')'''
+            return redirect('/pdfservice/painel-administrativo/novo-book')
 
     else:
         return render_template('novo-book.html')
